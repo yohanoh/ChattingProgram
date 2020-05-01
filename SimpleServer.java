@@ -6,6 +6,8 @@ import java.awt.TextArea;
 import java.awt.TextField;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowEvent;
+import java.awt.event.WindowListener;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -13,10 +15,10 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 
-public class SimpleServer extends Thread implements ActionListener{
+public class SimpleServer extends Thread implements ActionListener, WindowListener{
 	Frame frame;
-	TextArea ta;
-	TextField tf;
+	TextArea messageArea;
+	TextField inputField;
 	ServerSocket s;
 	Socket s1;
 	DataOutputStream dos;
@@ -28,31 +30,36 @@ public class SimpleServer extends Thread implements ActionListener{
 		service();
 	}
 	
+	/* UI을 초기화 해주는 메소드 */
 	public void launchFrame() {
-		frame = new Frame("일대일 채팅");
-		ta = new TextArea();
-		tf = new TextField();
+		frame = new Frame("채팅 프로그램 - Server");
+		frame.addWindowListener(this);
+		frame.setLocationRelativeTo(null);
+		messageArea = new TextArea();
+		inputField = new TextField();
+		
 		frame.setBackground(Color.lightGray);
-		ta.setEditable(false);
-		frame.add(ta, BorderLayout.CENTER);
-		frame.add(tf, BorderLayout.SOUTH);
-		tf.addActionListener(this);
+		messageArea.setEditable(false);
+		frame.add(messageArea, BorderLayout.CENTER);
+		frame.add(inputField, BorderLayout.SOUTH);
+		
+		inputField.addActionListener(this);
 		frame.setSize(500, 300);
 		frame.setVisible(true);
-		tf.requestFocus();
+		inputField.requestFocus();
 	}
 	
 	public void service() {
 		try {
-			ta.append("서비스 하기 위해 준비중..\n");
+			messageArea.append("서비스 하기 위해 준비중..\n");
 			s = new ServerSocket(5432);
-			ta.append("클라이언트 접속 대기중..");
+			messageArea.append("클라이언트 접속 대기중..");
 			s1 = s.accept();
-			ta.append("클라이언트가 접속하였습니다. : " + s1.getInetAddress() + "\n");
+			messageArea.append("클라이언트가 접속하였습니다. : " + s1.getInetAddress() + "\n");
 			dos = new DataOutputStream(s1.getOutputStream());
 			dis = new DataInputStream(s1.getInputStream());
-			this.start();
-			dos.writeUTF(" 채팅 서버에 접속하신걸 환영합니다.");
+			this.start(); //쓰레드 시작
+			dos.writeUTF(" 채팅 서버에 접속하신걸 환영합니다.\n");
 		}catch(IOException e) {e.printStackTrace();}
 	}
 	
@@ -62,34 +69,66 @@ public class SimpleServer extends Thread implements ActionListener{
 	
 	public void actionPerformed(ActionEvent action) {
 		try {
-			String msg = tf.getText();
-			ta.append(msg + "\n");
-			if(msg.equals("exit")) {
-				ta.append("bye");
-				stop = true;
-				dos.close();
-				s1.close();
-				System.exit(0);
-			}else {
-				dos.writeUTF("서버 : "+ msg);
-				tf.setText("");
-			}
+			String msg = "서버 : " + inputField.getText() + "\n";
+			messageArea.append(msg);
+			
+			dos.writeUTF(msg);
+			inputField.setText("");
+			
 		}catch(IOException e) {
-			ta.append(e.toString() + "\n");
+			messageArea.append(e.toString() + "\n");
 		}
 	}
 	
 	public void run() {
 		try {
 			while(!stop) {
-				ta.append(dis.readUTF() + "\n");
+				messageArea.append(dis.readUTF());
 			}
-			dis.close();
-			s1.close();
+			
 		}catch(EOFException e) {
-			ta.append("클라이언트로부터 연결이 끊어졌습니다.\n");
-		}catch(IOException e1) {
-			e1.printStackTrace();
+			messageArea.append("클라이언트로부터 연결이 끊어졌습니다.\n");
+		}catch(IOException e1) { // 생각 해보기
+			System.out.println("쓰레드 종료");
 		}
 	}
+	
+	@Override
+	public void windowActivated(WindowEvent e) {}
+
+	@Override
+	public void windowClosed(WindowEvent e) {}
+
+	@Override
+	public void windowClosing(WindowEvent e) {
+		// TODO Auto-generated method stub
+		if(e.getWindow() instanceof Frame) {
+			stop = true;
+			try {
+				if(s1 != null) { // 클라이언트와의 연결이 성공 후에
+					dis.close();
+					dos.close();
+					s1.close();
+				}
+			}catch(IOException e1) {
+				e1.printStackTrace();
+			}
+		}
+		
+		e.getWindow().setVisible(false);
+		e.getWindow().dispose();
+		System.exit(0);
+	}
+
+	@Override
+	public void windowDeactivated(WindowEvent e) {}
+
+	@Override
+	public void windowDeiconified(WindowEvent e) {}
+
+	@Override
+	public void windowIconified(WindowEvent e) {}
+
+	@Override
+	public void windowOpened(WindowEvent e) {}
 }
